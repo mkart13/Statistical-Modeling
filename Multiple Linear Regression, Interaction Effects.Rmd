@@ -1,0 +1,424 @@
+---
+header-includes:
+- \usepackage{amssymb, amsmath, amsthm}
+- \usepackage{tabu}
+- \newcommand{\E}{\mathbb{E}}
+- \newcommand{\var}{{\rm Var}}
+- \newcommand{\N}{\mathcal{N}}
+output:
+  html_document:
+    df_print: paged
+---
+
+\noindent \begin{tabu} to \textwidth {@{}X[4 l] @{}X[r]}
+  \textbf{Homework 3}           & \\ 
+  \textbf{MSBA 400: Statistical Foundations for Data Analytics}   & \\ 
+  \textbf{Professor Rossi}         & 
+\end{tabu}
+
+\bigskip
+
+
+### Question 1 : Prediction from Multiple Regressions
+
+### Q1, part A
+
+Run the multiple regression of `Sales` on `p1` and `p2` using the dataset, `multi`.
+
+**Answer Q1, Part A:**
+
+```{r}
+# Loading required libraries and dataset
+library("DataAnalytics")
+data("multi")
+
+# Multiple Linear Regression (Sales ~ p1 + p2)
+multi_lm = lm(formula = Sales ~ p1 + p2, data = multi)
+
+summary(multi_lm)
+```
+
+<br>
+<br>
+
+### Q1, part B
+
+Suppose we wish to use the regression from part A to estimate sales of this firm's product with, `p1` = $7.5.  To make predictions from the multiple regression, we will have to predict what p2 will be given that `p1` =$7.5.    
+
+Explain why setting `p2=mean(p2)` would be a bad choice. Be specific and comment on why this is true for this particular case (value of `p1).
+
+**Answer Q1, Part B:**
+
+To estimate sales using the multiple regression model, we need both `p1` and `p2`. While `p1` is provided, we should not assume `p2=mean(p2)` to get reasonably accurate predictions because there could be an inherent relation between `p1` and `p2`. 
+
+<br>
+
+Let's see scatter plot and correlation between `p1` and `p2`
+
+```{r}
+plot(multi$p1, multi$p2, xlab = "p1", ylab = "p2", main = "Scatter Plot p1 vs p2")
+
+print(paste0("Correlation between `p1` and `p2` is: ", cor(multi$p1, multi$p2)))
+```
+
+From the plot and the correlation value, we can see that there is some correlation between `p1` and `p2`. Furthermore, if we fit a simple linear regression between `sales` and `p1`, we see-
+
+```{r}
+slr = lm(formula = Sales ~ p1, data = multi)
+
+summary(slr)
+```
+
+In the simple linear regression model (`Sales` ~ `p1`), we observe the coefficient of `p1` very different from the same coefficient in the corresponding multiple linear regression model (`Sales` ~ `p1` + `p2`). The difference in `p1`'s coefficient (-97.66 vs. 63.71) implies that there is an interaction between `p1` and `p2` and hence, we expect `p1` to change with change in `p2`. Thus it is a bad choice to assume `p2=mean(p2)`.
+
+```{r}
+print(paste0("Mean value of `p2` is: ", mean(multi$p2)))
+print(paste0("Mean value of `p1` is: ", mean(multi$p1)))
+```
+
+From the above values and the scatter plot, we can see that when `p2 = mean(p2)` = \$8, we would expect `p1` to be ~\$4.8. But, we want to measure the `sales` for `p1` = $7.5. Hence, it is incorrect to use `p2 = mean(p2)` when `p1` = \$7.5. We should use the corresponding value of `p2`, which is ~\$12.5 to predict `sales`
+
+<br>
+<br>
+
+### Q1, part C
+
+Use a regression of `p2` on `p1` to predict what `p2` would be given that `p1` = $7.5. 
+
+**Answer Q1, Part C:**
+
+```{r}
+# Multiple Linear Regression (p2 ~ p1)
+multi_lm_p1p2 = lm(formula = p2 ~ p1, data=multi)
+
+summary(multi_lm_p1p2)
+```
+
+
+```{r}
+# Predict
+predout = predict(multi_lm_p1p2, new=data.frame(p1=7.5))
+
+predout
+```
+
+Hence, from the above regression model when `p1` = \$7.5, then `p2` should be equal to $12.
+
+<br>
+<br>
+
+### Q1, part D
+
+Use the predicted value of `p2` from part C, to predict `Sales`.  Show that this is the same predicted value of sales as you would get from the simple regression of `Sales` on `p1`.  Explain why this must be true.
+
+**Answer Q1, Part D:**
+
+Leveraging the multiple linear regression model (Sales ~ p1 + p2) to predict sales:
+```{r}
+# Leveraging the multiple linear regression model (Sales ~ p1 + p2) to predict sales
+pred_sales_mlr = predict(multi_lm, new=data.frame(p1=7.5, p2=12.00116))
+print(paste0("Estimated sales when p1=$7.5 and p2=$12 is: ",pred_sales_mlr))
+```
+
+
+Leveraging the Simple linear regression model (Sales ~ p1) to predict sales:
+```{r}
+# Leveraging the Simple linear regression model (Sales ~ p1) to predict sales
+pred_sales_slr = predict(slr, new=data.frame(p1=7.5))
+print(paste0("Estimated sales when p1=$7.5 is: ",pred_sales_slr))
+```
+
+Hence, we see the estimated sales from both the models (SLR and MLR) to be same when `p1` = \$7.5. This has to be true because in the SLR model (simple linear regression model) the coefficient of `p1` accounts for the impact of `p1` and the impact of all other variables which are related to `p1` (e.g. `p2`) on `sales`. Similarly, in the MLR model, by separating out `p2` and estimating `p2` by regressing `p2` on `p1`, we are essentially separating out the impact of `p2` explained by `p1` on `sales`. Thus both the models return the same `sales` estimate.
+
+<br>
+<br>
+
+### Question 2: Interactions
+
+An interaction term in a regression is formed by taking the product of two independent or predictor variables as in:
+
+$$Y_i = \beta_0 + \beta_1X1_i + \beta_2X2_i + \beta_3 X1_i*X2_i+\varepsilon_i $$
+This term has a non-linear effect, which allows the effect of variable $X1$ to be moderated by the level of $X2$. We can take the partial derivative of the conditional mean function to see this:
+$$ \frac{\partial}{\partial X1}E[Y|X1,X2] = \beta_1 + \beta3X2 $$
+
+Return to the regression in Chapter 6 of `log(emv)` on `luxury`, `sporty` and add the interaction term `luxury*sporty`.
+
+### Q2, part A
+
+Compute the change in `emv` we would expect to see if sporty increased by .1 units, holding luxury constant at .30 units
+
+**Answer Q2, Part A:**
+
+```{r}
+# Loading mvehicles dataset
+data(mvehicles)
+
+# Filtering only cars from the mvehicles dataset
+cars = mvehicles[mvehicles$bodytype != "Truck",]
+
+# Creating a new variable -> luxury * sporty 
+cars$luxury_sporty = cars$luxury * cars$sporty
+
+# Fitting multiple linear regression model
+vehicle_model = lm(log(emv)~luxury + sporty + luxury_sporty, data = cars)
+summary(vehicle_model)
+```
+Using the relation $$ \frac{\partial}{\partial X1}E[Y|X1,X2] = \beta_1 + \beta3X2 $$, we can derive the change in price as follows-
+
+```{r}
+# Coefficients of the model
+b_sporty = vehicle_model$coefficients['sporty']
+b_luxury_sporty = vehicle_model$coefficients['luxury_sporty']
+
+# Values to estimate sales
+luxury_val = 0.30
+change_in_sporty = 0.10
+
+rate_of_change_sporty = b_sporty + (b_luxury_sporty * luxury_val)
+emv_change = rate_of_change_sporty * change_in_sporty
+
+# Since we regress on log(price), we take exponential
+emv_change = exp(emv_change)
+
+print(paste0("If `sporty` was increased by .1 units, holding `luxury` constant at .30 units, then we would expect `emv` to multiply by: ", emv_change))
+```
+
+Hence, when we hold `luxury` constant at .30 unit and increase `sporty` by 0.1 units, we expect the price of the car to decrease to 99.78% of its initial value.
+
+<br>
+<br>
+
+### Q2, part B
+
+Compute the change in `emv` we would expect to see if sporty was increased by .1 units, holding luxury constant at .70 units.
+
+**Answer Q2, Part B:**
+
+```{r}
+# Coefficients of the model
+b_sporty = vehicle_model$coefficients['sporty']
+b_luxury_sporty = vehicle_model$coefficients['luxury_sporty']
+
+# Values to estimate sales
+luxury_val = 0.70
+change_in_sporty = 0.10
+
+rate_of_change_sporty = b_sporty + (b_luxury_sporty * luxury_val)
+emv_change = rate_of_change_sporty * change_in_sporty
+
+# Since we regress on log(price), we take exponential
+emv_change = exp(emv_change)
+
+print(paste0("If `sporty` was increased by .1 units, holding `luxury` constant at .70 units, then we would expect `emv` to multiply by: ", emv_change))
+```
+Hence, when we hold `luxury` constant at .70 unit and increase `sporty` by 0.1 units, we expect the price of the car to increase to 105% of its initial value.
+
+<br>
+<br>
+
+### Q2, part C
+
+Why are the answers different in part A and part B?  Does the interaction term make intuitive sense to you? Why?
+
+**Answer Q2, Part C:**
+
+The answers in part A and part B are different because we expect the inherent interaction between `sporty` and `luxury` to influence change in `price`. The impact of `sporty` on `price` changes with `luxury`. Using the relation $$ \frac{\partial}{\partial X1}E[Y|X1,X2] = \beta_1 + \beta3X2 $$, we can say that the rate of change in log(price) by change in `sporty` is a linear relation which depends on `luxury`. Hence, as the value of `luxury` changes (0.3 vs. 0.7), we expect the impact of `sporty` on `price` to change.
+
+The interaction term "`sporty` * `luxury`" and its coefficient are intuitive. The positive coefficient (1.29) for the interaction term implies that the impact of `sporty` on `price` increases as `luxury` index increases. This is expected because the more luxurious a car is , we can expect its price to increase a lot more as we increase the "sportiness" of the car. The decrease in the price of cars at lower values of `luxury` is because there is not much relationship between the sportiness of a car and its luxury for less luxurious cars.
+
+<br>
+<br>
+
+
+### Question 3: More on ggplot2 and regression planes
+
+The classic dataset, `diamonds`, (you must load the `ggplot2` package to access this data) has about 50,000 prices of diamonds along with weight (`carat`) and quality of cut (`cut`).
+
+
+1. Use ggplot2 to visualize the relationship between price and carat and cut. 'price' is the dependent variable. Consider both the log() and sqrt() transformation of price. 
+
+**Answer Q3, Part 1:**
+
+```{r}
+library(ggplot2)
+data(diamonds)
+cutf=as.character(diamonds$cut)
+cutf=as.factor(cutf) 
+```
+
+
+#### Scatter Plot with Actual Values (i.e. No Transformation):
+
+```{r}
+ggplot(diamonds, aes(x= carat, y = price)) +
+  geom_point(color="light blue") +
+  facet_wrap(~cut) + 
+  theme_minimal(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 45, 
+                                   hjust = 1)) +
+  geom_smooth(method = "lm") +
+  labs(title = "Price vs. Carat Scatter Plot",
+       x = "Carat",
+       y = "Price") 
+
+```
+
+
+```{r}
+ggplot(data=diamonds, aes(x=carat, y =price, color=cut)) +
+  geom_point(alpha=0.5) +
+  labs(y="Price", x="Carat", subtitle="Price vs. Carat Scatter Plot")
+```
+
+
+**Key Observations:**
+- 1. Across all `cut` categories, the price of a diamond has an increasing trend as `Carat` value increases. This is expected as we know that high carat diamonds are more expensive than lower carat diamonds.
+
+- 2. The variance in prices is increasing with increasing values of `Carat` (i.e.`x`). Therefore, the variance cannot be assumed to be approximately constant as `x` (i.e. `Carat`) increases. This is true across all `cut` categories.
+
+<br>
+<br>
+
+#### Log Transformation:
+
+```{r}
+ggplot(diamonds, aes(x= carat, y = log(price))) +
+  geom_point(color="light blue") +
+  facet_wrap(~cut) + 
+  theme_minimal(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 45, 
+                                   hjust = 1)) +
+  geom_smooth(method = "lm") +
+  labs(title = "Log(Price) vs. Carat Scatter Plot",
+       x = "Carat",
+       y = "Log(Price)") 
+
+```
+
+```{r}
+ggplot(data=diamonds, aes(x=carat, y =log(price), color=cut)) +
+  geom_point(alpha=0.5) +
+  labs(y="Log(Price)", x="Carat", subtitle="Log(Price) vs. Carat Scatter Plot")
+```
+
+<br>
+<br>
+
+#### Square Root Transformation:
+
+```{r}
+ggplot(diamonds, aes(x= carat, y = sqrt(price))) +
+  geom_point(color="light blue") +
+  facet_wrap(~cut) + 
+  theme_minimal(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 45, 
+                                   hjust = 1)) +
+  geom_smooth(method = "lm") +
+  labs(title = "Sqrt(Price) vs. Carat Scatter Plot",
+       x = "Carat",
+       y = "sqrt(Price)") 
+
+```
+
+
+```{r}
+ggplot(data=diamonds, aes(x=carat, y =sqrt(price), color=cut)) +
+  geom_point(alpha=0.5) +
+  labs(y="Sqrt(Price)", x="Carat", subtitle="Sqrt(Price) vs. Carat Scatter Plot")
+```
+
+**Key Observations:** If we compare the plots for the actual values of `price` vs. `carat` with the transformed values of `price` (i.e. log() and sqrt() transformation), we observe that variance of `price` is changing with `carat`. This is true for `Log(price)` and `sqrt(price)` as well. However, overall the square root transformation of `price` seems suitable to fit a regression line on the data as it has the lowest change in variance in `Price` and yields are relatively more linear relationship between `price` and `carat`.
+
+<br>
+<br>
+
+2. Run a regression of your preferred specification. Perform residual diagnostics. What do you conclude from your regression diagnostic plots of residuals vs. fitted and residuals vs. carat? 
+
+note: `cut` is a special type of variable called an ordered factor in R. For ease of interpretation, convert the ordered factor into a "regular" or non-ordinal factor.
+
+
+**Answer Q3, Part 2:**
+
+We have two decisions to make to build our regression model:
+<br>
+- 1. Should we use both `carat` and `cut` or just `carat`?
+- 2. Which transformation is most suitable to build the linear regression model
+
+**1. Relationship between a. `Log(Price)` - `Cut` and b. `Log(carat)` - `cut`**
+
+```{r}
+qplot(y=log(price), x= factor(cutf, levels = c("Fair", "Good", "Very Good", "Premium", "Ideal")), data=diamonds, geom=c("boxplot"),
+   fill=cutf, main="Relationship between Log(`Price`) and `Cut`",
+   xlab="Cut", ylab="Log(Price)")
+```
+<br>
+
+```{r}
+qplot(y=log(carat), x= factor(cutf, levels = c("Fair", "Good", "Very Good", "Premium", "Ideal")), data=diamonds, geom=c("boxplot"),
+   fill=cutf, main="Relationship between `Log(Carat)` and `Cut`",
+   xlab="Cut", ylab="Log(Carat)")
+```
+
+**Key Observations:**
+From the above plots, we can see that `cut` does not have a strong relationship with `price` or with `carat`. The min `price` values and the max `price` values across all `cut` categories is very similar (i.e. min `price` value of "Ideal" cut is very similar to min `price` value "Fair" cut diamonds). The same can be said for the 3rd Quartile `price` value. Hence, we are discarding this feature from `price` prediction.
+
+<br>
+<br>
+
+**We will use Log-Log transformation on `price`~`carat` as that yields the best linear relationship between `price` and `carat`.**
+
+```{r}
+ggplot(diamonds, aes(x= log(carat), y = log(price))) +
+  geom_point(color="light blue") +
+  facet_wrap(~cut) + 
+  theme_minimal(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 45, 
+                                   hjust = 1)) +
+  geom_smooth(method = "lm") +
+  labs(title = "Log(Price) vs. Log(Carat) Scatter Plot",
+       x = "Log(Carat)",
+       y = "Log(Price)") 
+
+```
+
+```{r}
+ggplot(data=diamonds, aes(x=log(carat), y =log(price), color=cut)) +
+  geom_point(alpha=0.5) +
+  labs(y="Log(Price)", x="Log(Carat)", subtitle="Log(Price) vs. Log(Carat) Scatter Plot")
+```
+
+
+
+**Let's fit our regression model based on the above two decisions:**
+
+``` {r}
+# Fitting a multiple linear regression model
+diamond_mlr_2 = lm(formula=log(price) ~ log(carat) ,data=diamonds)
+summary(diamond_mlr_2)
+```
+
+**Regression diagnostic plots of residuals vs. fitted values**
+
+```{r}
+qplot(x=fitted(diamond_mlr_2), y=resid(diamond_mlr_2), colour = I("blue"), xlab="Fitted Values", ylab="Residuals") + geom_hline(yintercept=0)
+```
+
+
+```{r}
+cor(fitted(diamond_mlr_2), resid(diamond_mlr_2))
+```
+
+**Key observations:** The residuals are randomly distributed above and below the x-axis and have no correlation with the fitted values. This implies that the linear model assumption holds true Corr(residuals, fitted values) = 0. Furthermore, the variance in residuals is approximately constant across the range of fitted values. This is another assumption of linear model which appears to be valid.
+
+<br>
+
+**Regression diagnostic plots of residuals vs. `carat`**
+
+```{r}
+qplot(x=diamonds$carat, y=resid(diamond_mlr_2), colour = I("blue"), xlab="Carat", ylab="Residuals") + geom_hline(yintercept=0)
+```
+
+```{r}
+cor(diamonds$carat, resid(diamond_mlr_2))
+```
+**Key observations:** The residuals mostly appear to be randomly distributed above and below the x-axis and have ~0 correlation with `carat`. This implies that the linear model assumption holds true Corr(residuals, fitted values) = 0.
